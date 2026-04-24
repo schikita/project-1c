@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     secret_key: str = "change_me"
     access_token_expire_minutes: int = 30
     refresh_token_expire_minutes: int = 10080
+    llm_provider: str = "mock"
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
 
 settings = Settings()

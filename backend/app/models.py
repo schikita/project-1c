@@ -112,3 +112,41 @@ class OneCIntegrationLog(Base):
     response_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class AIAssistantRun(Base):
+    __tablename__ = "ai_assistant_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    issue_id: Mapped[int] = mapped_column(ForeignKey("diagnostic_issues.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    input_context_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    model_name: Mapped[str] = mapped_column(String(128), default="mock")
+    output_plan_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="completed")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CorrectionPlan(Base):
+    __tablename__ = "correction_plans"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    issue_id: Mapped[int] = mapped_column(ForeignKey("diagnostic_issues.id"))
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text)
+    risk_level: Mapped[str] = mapped_column(String(16), default="medium")
+    requires_confirmation: Mapped[bool] = mapped_column(Boolean, default=True)
+    requires_backup: Mapped[bool] = mapped_column(Boolean, default=False)
+    actions_json: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CorrectionAction(Base):
+    __tablename__ = "correction_actions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("correction_plans.id"))
+    action_type: Mapped[str] = mapped_column(String(128))
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    result_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

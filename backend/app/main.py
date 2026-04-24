@@ -1,4 +1,5 @@
 from datetime import date
+import asyncio
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -8,9 +9,21 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_db
+from app.ai_assistant.service import ALLOWED_ACTION_TYPES, generate_correction_plan
 from app.common.enums import DiagnosticStatus, UserRole
 from app.diagnostics.tasks import run_diagnostic_task
-from app.models import AuditLog, DiagnosticIssue, DiagnosticRun, KnowledgeArticle, OneCConnection, OneCIntegrationLog, User
+from app.models import (
+    AIAssistantRun,
+    AuditLog,
+    CorrectionAction,
+    CorrectionPlan,
+    DiagnosticIssue,
+    DiagnosticRun,
+    KnowledgeArticle,
+    OneCConnection,
+    OneCIntegrationLog,
+    User,
+)
 from app.onec.mock_client import MockOneCClient
 from app.security import create_token, decode_token, hash_password, verify_password
 
@@ -97,6 +110,11 @@ class KnowledgeArticlePatchRequest(BaseModel):
     checks: str | None = None
     fix_steps: str | None = None
     tags: list[str] | None = None
+
+
+class AIAssistantCreateRequest(BaseModel):
+    issue_id: int
+    model_name: str | None = None
 
 
 def add_audit_log(db: Session, user_id: int | None, action: str, payload: dict | None = None):
@@ -505,6 +523,126 @@ def rerun(run_id: int, db: Session = Depends(get_db), current_user: User = Depen
     run_diagnostic_task.delay(new_run.id)
     add_audit_log(db, current_user.id, "diagnostics.run.rerun", {"source_run_id": run.id, "new_run_id": new_run.id})
     return {"run_id": new_run.id, "status": new_run.status}
+
+
+@app.post("/api/ai-assistant/runs")
+def create_ai_assistant_run(
+    payload: AIAssistantCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.owner, UserRole.admin, UserRole.accountant)),
+):
+    issue = db.query(DiagnosticIssue).filter(DiagnosticIssue.id == payload.issue_id).first()
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    context = {
+        "issue": {
+            "id": issue.id,
+            "title": issue.title,
+            "description": issue.description,
+            "detected_reason": issue.detected_reason,
+            "category": issue.category,
+            "severity": issue.severity,
+            "account_code": issue.account_code,
+            "evidence": issue.evidence_json,
+        }
+    }
+    model_name, plan = asyncio.run(generate_correction_plan(context=context, model_name=payload.model_name))
+    ai_run = AIAssistantRun(
+        issue_id=issue.id,
+        user_id=current_user.id,
+        input_context_json=context,
+        model_name=model_name,
+        output_plan_json=plan,
+        status="completed",
+    )
+    db.add(ai_run)
+    db.commit()
+    db.refresh(ai_run)
+    plan_row = CorrectionPlan(
+        issue_id=issue.id,
+        title=plan.get("title", "Correction plan"),
+        description=plan.get("description", ""),
+        risk_level=plan.get("risk_level", "medium"),
+        requires_confirmation=bool(plan.get("requires_confirmation", True)),
+        requires_backup=bool(plan.get("requires_backup", False)),
+        actions_json=plan.get("actions", []),
+        status="draft",
+    )
+    db.add(plan_row)
+    db.commit()
+    db.refresh(plan_row)
+
+    for action in plan.get("actions", []):
+        action_type = action.get("action_type")
+        if action_type in ALLOWED_ACTION_TYPES:
+            db.add(CorrectionAction(plan_id=plan_row.id, action_type=action_type, payload_json=action.get("payload_json", {})))
+    db.commit()
+    add_audit_log(db, current_user.id, "ai_assistant.run.create", {"issue_id": issue.id, "run_id": ai_run.id, "plan_id": plan_row.id})
+    return {"run_id": ai_run.id, "plan_id": plan_row.id, "model_name": ai_run.model_name, "status": ai_run.status}
+
+
+@app.get("/api/ai-assistant/runs/{run_id}")
+def get_ai_assistant_run(run_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    run = db.query(AIAssistantRun).filter(AIAssistantRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="AI run not found")
+    return {
+        "id": run.id,
+        "issue_id": run.issue_id,
+        "user_id": run.user_id,
+        "model_name": run.model_name,
+        "output_plan": run.output_plan_json,
+        "status": run.status,
+        "created_at": run.created_at,
+    }
+
+
+@app.get("/api/correction-plans/{plan_id}")
+def get_correction_plan(plan_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    plan = db.query(CorrectionPlan).filter(CorrectionPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    actions = db.query(CorrectionAction).filter(CorrectionAction.plan_id == plan.id).all()
+    return {
+        "id": plan.id,
+        "issue_id": plan.issue_id,
+        "title": plan.title,
+        "description": plan.description,
+        "risk_level": plan.risk_level,
+        "requires_confirmation": plan.requires_confirmation,
+        "requires_backup": plan.requires_backup,
+        "status": plan.status,
+        "actions": [{"id": a.id, "action_type": a.action_type, "payload_json": a.payload_json, "status": a.status} for a in actions],
+    }
+
+
+@app.post("/api/correction-plans/{plan_id}/confirm")
+def confirm_correction_plan(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.owner, UserRole.admin, UserRole.accountant)),
+):
+    plan = db.query(CorrectionPlan).filter(CorrectionPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    plan.status = "confirmed"
+    actions = db.query(CorrectionAction).filter(CorrectionAction.plan_id == plan.id).all()
+    for action in actions:
+        action.status = "prepared"
+    db.commit()
+    add_audit_log(db, current_user.id, "correction_plan.confirm", {"plan_id": plan_id})
+    return {"id": plan.id, "status": plan.status}
+
+
+@app.post("/api/correction-plans/{plan_id}/reject")
+def reject_correction_plan(plan_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    plan = db.query(CorrectionPlan).filter(CorrectionPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    plan.status = "rejected"
+    db.commit()
+    add_audit_log(db, current_user.id, "correction_plan.reject", {"plan_id": plan_id})
+    return {"id": plan.id, "status": plan.status}
 
 
 @app.post("/api/diagnostics/pre-month-close")
