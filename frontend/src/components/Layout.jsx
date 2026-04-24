@@ -1,9 +1,10 @@
 import React from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const links = [
     ["/", "Главная"],
     ["/connections", "Подключения"],
@@ -15,6 +16,11 @@ export default function Layout() {
     ["/reports", "Отчеты"],
     ["/users", "Пользователи"],
   ];
+  const logout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    navigate("/login", { replace: true });
+  };
 
   return (
     <Box>
@@ -35,6 +41,15 @@ export default function Layout() {
               {label}
             </Button>
           ))}
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            onClick={logout}
+            variant="outlined"
+            color="inherit"
+            sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.5)" }}
+          >
+            Выйти
+          </Button>
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl" sx={{ py: 3 }}>
