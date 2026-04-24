@@ -2,7 +2,7 @@ from datetime import date
 import asyncio
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
@@ -133,6 +133,35 @@ def add_integration_log(db: Session, connection_id: int | None, method: str, sta
         )
     )
     db.commit()
+
+
+def build_diagnostic_report_html(db: Session, run_id: int) -> str:
+    run = db.query(DiagnosticRun).filter(DiagnosticRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    issues = db.query(DiagnosticIssue).filter(DiagnosticIssue.run_id == run_id).all()
+    rows = "".join(
+        [
+            f"<tr><td>{i.severity}</td><td>{i.category}</td><td>{i.title}</td><td>{i.detected_reason}</td><td>{i.status}</td></tr>"
+            for i in issues
+        ]
+    )
+    return f"""
+    <html>
+      <head><meta charset="utf-8"><title>Diagnostic report #{run.id}</title></head>
+      <body>
+        <h1>Отчет диагностики #{run.id}</h1>
+        <p>Организация: {run.organization_id}</p>
+        <p>Период: {run.period_start} - {run.period_end}</p>
+        <p>Статус: {run.status}</p>
+        <h2>Проблемы</h2>
+        <table border="1" cellspacing="0" cellpadding="6">
+          <thead><tr><th>Критичность</th><th>Категория</th><th>Проблема</th><th>Причина</th><th>Статус</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>
+      </body>
+    </html>
+    """
 
 
 def get_token_payload(authorization: Annotated[str | None, Header()] = None) -> dict:
@@ -702,33 +731,39 @@ def report_html(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    html = build_diagnostic_report_html(db, run_id)
+    add_audit_log(db, current_user.id, "reports.run.html", {"run_id": run_id})
+    return HTMLResponse(content=html)
+
+
+@app.post("/api/reports/diagnostic-runs/{run_id}/signed-link")
+def create_report_signed_link(
+    run_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     run = db.query(DiagnosticRun).filter(DiagnosticRun.id == run_id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
-    issues = db.query(DiagnosticIssue).filter(DiagnosticIssue.run_id == run_id).all()
-    rows = "".join(
-        [
-            f"<tr><td>{i.severity}</td><td>{i.category}</td><td>{i.title}</td><td>{i.detected_reason}</td><td>{i.status}</td></tr>"
-            for i in issues
-        ]
-    )
-    html = f"""
-    <html>
-      <head><meta charset="utf-8"><title>Diagnostic report #{run.id}</title></head>
-      <body>
-        <h1>Отчет диагностики #{run.id}</h1>
-        <p>Организация: {run.organization_id}</p>
-        <p>Период: {run.period_start} - {run.period_end}</p>
-        <p>Статус: {run.status}</p>
-        <h2>Проблемы</h2>
-        <table border="1" cellspacing="0" cellpadding="6">
-          <thead><tr><th>Критичность</th><th>Категория</th><th>Проблема</th><th>Причина</th><th>Статус</th></tr></thead>
-          <tbody>{rows}</tbody>
-        </table>
-      </body>
-    </html>
-    """
-    add_audit_log(db, current_user.id, "reports.run.html", {"run_id": run_id})
+    token = create_token(f"report:{run_id}", "report_link", 10)
+    base_url = f"{request.url.scheme}://{request.url.hostname}:18080"
+    signed_url = f"{base_url}/api/reports/public/{run_id}/html?token={token}"
+    add_audit_log(db, current_user.id, "reports.run.signed_link", {"run_id": run_id})
+    return {"url": signed_url, "expires_in_minutes": 10}
+
+
+@app.get("/api/reports/public/{run_id}/html", response_class=HTMLResponse)
+def report_html_public(run_id: int, token: str, db: Session = Depends(get_db)):
+    try:
+        payload = decode_token(token)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("type") != "report_link":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+    if payload.get("sub") != f"report:{run_id}":
+        raise HTTPException(status_code=401, detail="Token does not match report")
+    html = build_diagnostic_report_html(db, run_id)
     return HTMLResponse(content=html)
 
 

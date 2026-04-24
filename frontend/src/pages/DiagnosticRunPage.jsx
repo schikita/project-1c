@@ -6,8 +6,6 @@ import PageLoader from "../components/PageLoader";
 import SectionCard from "../components/SectionCard";
 import SeverityBadge from "../components/SeverityBadge";
 
-const REPORTS_BASE = `${window.location.protocol}//${window.location.hostname}:18080`;
-
 export default function DiagnosticRunPage() {
   const { runId } = useParams();
   const [run, setRun] = useState(null);
@@ -49,6 +47,14 @@ export default function DiagnosticRunPage() {
     await apiFetch(`/api/diagnostics/runs/${runId}/rerun`, { method: "POST" });
     await load();
   };
+  const exportHtml = async () => {
+    try {
+      const data = await apiFetch(`/api/reports/diagnostic-runs/${runId}/signed-link`, { method: "POST" });
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const filteredIssues = issues.filter((issue) => {
     const matchesSeverity = severityFilter === "all" || issue.severity === severityFilter;
@@ -77,7 +83,7 @@ export default function DiagnosticRunPage() {
         <p>
           Статус: <b>{run.status}</b>, прогресс: {run.progress_percent}%.
           {" "}
-          <a href={`${REPORTS_BASE}/api/reports/diagnostic-runs/${runId}/html`} target="_blank" rel="noreferrer">Экспорт HTML</a>
+          <button onClick={exportHtml}>Экспорт HTML</button>
         </p>
       )}
       <button onClick={rerun}>Повторить проверку</button>

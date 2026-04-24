@@ -4,12 +4,18 @@ import { apiFetch } from "../api/client";
 import PageError from "../components/PageError";
 import PageLoader from "../components/PageLoader";
 
-const REPORTS_BASE = `${window.location.protocol}//${window.location.hostname}:18080`;
-
 export default function ReportsPage() {
   const [runs, setRuns] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const exportHtml = async (runId) => {
+    try {
+      const data = await apiFetch(`/api/reports/diagnostic-runs/${runId}/signed-link`, { method: "POST" });
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   useEffect(() => {
     apiFetch("/api/diagnostics/runs")
@@ -30,13 +36,7 @@ export default function ReportsPage() {
             <Link to={`/diagnostics/runs/${run.id}`}>Запуск #{run.id}</Link>
             {" "}({run.diagnostic_type}, {run.status})
             {" | "}
-            <a
-              href={`${REPORTS_BASE}/api/reports/diagnostic-runs/${run.id}/html`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Экспорт HTML
-            </a>
+            <button onClick={() => exportHtml(run.id)}>Экспорт HTML</button>
           </li>
         ))}
       </ul>
