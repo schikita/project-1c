@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import "./styles.css";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/ToastProvider";
 import AccountingPolicyPage from "./pages/AccountingPolicyPage";
