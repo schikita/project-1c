@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:18080`;
 
 export async function apiFetch(path, options = {}) {
   const token = localStorage.getItem("access_token");
