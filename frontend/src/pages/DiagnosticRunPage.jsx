@@ -6,6 +6,8 @@ import PageLoader from "../components/PageLoader";
 import SectionCard from "../components/SectionCard";
 import SeverityBadge from "../components/SeverityBadge";
 
+const REPORTS_BASE = `${window.location.protocol}//${window.location.hostname}:18080`;
+
 export default function DiagnosticRunPage() {
   const { runId } = useParams();
   const [run, setRun] = useState(null);
@@ -75,7 +77,7 @@ export default function DiagnosticRunPage() {
         <p>
           Статус: <b>{run.status}</b>, прогресс: {run.progress_percent}%.
           {" "}
-          <a href={`http://localhost:8000/api/reports/diagnostic-runs/${runId}/html`} target="_blank" rel="noreferrer">Экспорт HTML</a>
+          <a href={`${REPORTS_BASE}/api/reports/diagnostic-runs/${runId}/html`} target="_blank" rel="noreferrer">Экспорт HTML</a>
         </p>
       )}
       <button onClick={rerun}>Повторить проверку</button>

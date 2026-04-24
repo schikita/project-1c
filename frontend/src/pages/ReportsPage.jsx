@@ -4,6 +4,8 @@ import { apiFetch } from "../api/client";
 import PageError from "../components/PageError";
 import PageLoader from "../components/PageLoader";
 
+const REPORTS_BASE = `${window.location.protocol}//${window.location.hostname}:18080`;
+
 export default function ReportsPage() {
   const [runs, setRuns] = useState([]);
   const [error, setError] = useState("");
@@ -29,7 +31,7 @@ export default function ReportsPage() {
             {" "}({run.diagnostic_type}, {run.status})
             {" | "}
             <a
-              href={`http://localhost:8000/api/reports/diagnostic-runs/${run.id}/html`}
+              href={`${REPORTS_BASE}/api/reports/diagnostic-runs/${run.id}/html`}
               target="_blank"
               rel="noreferrer"
             >
