@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
 import { apiFetch } from "../api/client";
 import PageError from "../components/PageError";
 import { useToast } from "../components/ToastProvider";
@@ -30,14 +31,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", fontFamily: "Arial, sans-serif" }}>
-      <h2>Вход</h2>
-      <form onSubmit={onSubmit}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ width: "100%", marginBottom: 8 }} />
-        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Пароль" style={{ width: "100%", marginBottom: 8 }} />
-        <button type="submit">Войти</button>
-      </form>
-      <PageError message={error} />
-    </div>
+    <Box sx={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
+      <Card sx={{ width: 420, maxWidth: "95vw" }}>
+        <CardContent>
+          <Typography variant="h5" sx={{ mb: 2 }}>Вход в систему</Typography>
+          <Stack component="form" onSubmit={onSubmit} spacing={2}>
+            <TextField value={email} onChange={(e) => setEmail(e.target.value)} label="Email" />
+            <TextField value={password} onChange={(e) => setPassword(e.target.value)} type="password" label="Пароль" />
+            <Button type="submit" variant="contained">Войти</Button>
+          </Stack>
+          <PageError message={error} />
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

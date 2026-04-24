@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Button, Card, CardContent, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { apiFetch } from "../api/client";
 import PageError from "../components/PageError";
 import { useToast } from "../components/ToastProvider";
@@ -36,25 +37,27 @@ export default function DiagnosticsPage() {
   };
 
   return (
-    <div>
-      <h3>Запуск диагностики</h3>
-      <div style={{ display: "grid", gap: 8, maxWidth: 460 }}>
-        <input value={connectionId} onChange={(e) => setConnectionId(e.target.value)} placeholder="ID подключения" />
-        <input value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} placeholder="ID организации" />
-        <input value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} type="date" />
-        <input value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} type="date" />
-        <select value={diagnosticType} onChange={(e) => setDiagnosticType(e.target.value)}>
-          <option value="pre_month_close">pre_month_close</option>
-          <option value="post_month_close">post_month_close</option>
-        </select>
-        <button onClick={runDiagnostic}>Запустить проверку</button>
-      </div>
+    <Card>
+      <CardContent>
+        <Typography variant="h5" sx={{ mb: 2 }}>Запуск диагностики</Typography>
+        <Stack spacing={2} sx={{ maxWidth: 520 }}>
+          <TextField value={connectionId} onChange={(e) => setConnectionId(e.target.value)} label="ID подключения" />
+          <TextField value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} label="ID организации" />
+          <TextField value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} type="date" label="Период с" InputLabelProps={{ shrink: true }} />
+          <TextField value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} type="date" label="Период по" InputLabelProps={{ shrink: true }} />
+          <TextField select value={diagnosticType} onChange={(e) => setDiagnosticType(e.target.value)} label="Тип диагностики">
+            <MenuItem value="pre_month_close">Перед закрытием месяца</MenuItem>
+            <MenuItem value="post_month_close">После закрытия месяца</MenuItem>
+          </TextField>
+          <Button variant="contained" onClick={runDiagnostic}>Запустить проверку</Button>
+        </Stack>
       {result && (
-        <p>
+        <Typography sx={{ mt: 2 }}>
           Создан запуск <Link to={`/diagnostics/runs/${result.run_id}`}>#{result.run_id}</Link>, статус: {result.status}
-        </p>
+        </Typography>
       )}
       <PageError message={error} />
-    </div>
+      </CardContent>
+    </Card>
   );
 }

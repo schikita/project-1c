@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "./styles.css";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/ToastProvider";
@@ -30,40 +31,53 @@ function PrivateRoute({ children }) {
 }
 
 function App() {
+  const theme = createTheme({
+    palette: {
+      mode: "light",
+      primary: { main: "#2563eb" },
+      secondary: { main: "#7c3aed" },
+      background: { default: "#f3f6fb" },
+    },
+    shape: { borderRadius: 10 },
+  });
+
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <Layout />
-              </PrivateRoute>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="connections" element={<ConnectionsPage />} />
-            <Route path="connections/new" element={<CreateConnectionPage />} />
-            <Route path="connections/:connectionId" element={<ConnectionDetailsPage />} />
-            <Route path="diagnostics" element={<DiagnosticsPage />} />
-            <Route path="diagnostics/runs/:runId" element={<DiagnosticRunPage />} />
-            <Route path="issues/:issueId" element={<DiagnosticIssuePage />} />
-            <Route path="manual-operations" element={<ManualOperationsPage />} />
-            <Route path="missing-analytics" element={<MissingAnalyticsPage />} />
-            <Route path="accounting-policy" element={<AccountingPolicyPage />} />
-            <Route path="knowledge" element={<KnowledgeBasePage />} />
-            <Route path="knowledge/:slug" element={<KnowledgeArticlePage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="audit-log" element={<AuditLogPage />} />
-            <Route path="integration-log" element={<IntegrationLogPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <Layout />
+                </PrivateRoute>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="connections" element={<ConnectionsPage />} />
+              <Route path="connections/new" element={<CreateConnectionPage />} />
+              <Route path="connections/:connectionId" element={<ConnectionDetailsPage />} />
+              <Route path="diagnostics" element={<DiagnosticsPage />} />
+              <Route path="diagnostics/runs/:runId" element={<DiagnosticRunPage />} />
+              <Route path="issues/:issueId" element={<DiagnosticIssuePage />} />
+              <Route path="manual-operations" element={<ManualOperationsPage />} />
+              <Route path="missing-analytics" element={<MissingAnalyticsPage />} />
+              <Route path="accounting-policy" element={<AccountingPolicyPage />} />
+              <Route path="knowledge" element={<KnowledgeBasePage />} />
+              <Route path="knowledge/:slug" element={<KnowledgeArticlePage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="audit-log" element={<AuditLogPage />} />
+              <Route path="integration-log" element={<IntegrationLogPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

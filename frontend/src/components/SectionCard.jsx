@@ -1,8 +1,13 @@
+import React from "react";
+import { Card, CardContent, Typography } from "@mui/material";
+
 export default function SectionCard({ title, children }) {
   return (
-    <section style={{ marginBottom: 14 }}>
-      <h4 style={{ marginBottom: 8 }}>{title}</h4>
-      {children}
-    </section>
+    <Card variant="outlined" sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>{title}</Typography>
+        {children}
+      </CardContent>
+    </Card>
   );
 }

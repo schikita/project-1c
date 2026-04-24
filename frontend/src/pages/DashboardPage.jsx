@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Alert, Card, CardContent, Stack, Typography } from "@mui/material";
 import { apiFetch } from "../api/client";
 import PageLoader from "../components/PageLoader";
 import SectionCard from "../components/SectionCard";
@@ -60,7 +61,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h3>Главная панель</h3>
+      <Typography variant="h4" sx={{ mb: 2 }}>Главная панель</Typography>
       {loading && <PageLoader />}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <StatCard title="Всего запусков" value={totalRuns} />
@@ -69,7 +70,7 @@ export default function DashboardPage() {
         <StatCard title="С ошибкой" value={failedRuns} />
       </div>
 
-      <div style={{ marginBottom: 14 }}>
+      <Alert severity="info" sx={{ mb: 2 }}>
         <b>Быстрые действия:</b>{" "}
         <Link to="/diagnostics">Проверить перед/после закрытия</Link>
         {" | "}
@@ -78,35 +79,36 @@ export default function DashboardPage() {
         <Link to="/missing-analytics">Документы без аналитики</Link>
         {" | "}
         <Link to="/accounting-policy">Проверить учетную политику</Link>
-      </div>
+      </Alert>
 
       <SectionCard title="Последние диагностики">
-      <ul>
-        {runs.slice(0, 5).map((run) => (
-          <li key={run.id}>
-            <Link to={`/diagnostics/runs/${run.id}`}>#{run.id}</Link> - {run.diagnostic_type} - {run.status} ({run.progress_percent}%)
-          </li>
-        ))}
-      </ul>
+        <Stack spacing={1}>
+          {runs.slice(0, 5).map((run) => (
+            <Card key={run.id} variant="outlined">
+              <CardContent sx={{ py: 1.5 }}>
+                <Typography variant="body2">
+                  <Link to={`/diagnostics/runs/${run.id}`}>#{run.id}</Link> - {run.diagnostic_type} - {run.status} ({run.progress_percent}%)
+                </Typography>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
       </SectionCard>
       <SectionCard title="Последние критичные проблемы">
-      <ul>
-        {criticalIssues.length === 0 && <li>Критичные проблемы не найдены.</li>}
-        {criticalIssues.map((issue) => (
-          <li key={issue.id}>
-            <Link to={`/issues/${issue.id}`}>{issue.title}</Link>
-            {" "}
-            <SeverityBadge severity={issue.severity} />
-            {" "}
-            ({issue.category})
-            {issue.run_id ? (
-              <>
-                {" "}— запуск <Link to={`/diagnostics/runs/${issue.run_id}`}>#{issue.run_id}</Link>
-              </>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+        {criticalIssues.length === 0 && <Typography variant="body2">Критичные проблемы не найдены.</Typography>}
+        <Stack spacing={1}>
+          {criticalIssues.map((issue) => (
+            <Card key={issue.id} variant="outlined">
+              <CardContent sx={{ py: 1.5 }}>
+                <Typography variant="body2">
+                  <Link to={`/issues/${issue.id}`}>{issue.title}</Link>{" "}
+                  <SeverityBadge severity={issue.severity} /> ({issue.category})
+                  {issue.run_id ? <> — запуск <Link to={`/diagnostics/runs/${issue.run_id}`}>#{issue.run_id}</Link></> : null}
+                </Typography>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
       </SectionCard>
     </div>
   );
