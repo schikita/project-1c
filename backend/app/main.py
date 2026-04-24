@@ -2,6 +2,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -16,6 +17,17 @@ from app.security import create_token, decode_token, hash_password, verify_passw
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Diagnostic Assistant 1C")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://185.244.50.22:15173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class RegisterRequest(BaseModel):
