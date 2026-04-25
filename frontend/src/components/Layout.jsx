@@ -35,6 +35,7 @@ export default function Layout() {
     ["/accounting-policy", "Учетная политика"],
     ["/knowledge", "База знаний"],
     ["/reports", "Отчеты"],
+    ["/ai-assistant", "AI Assistant"],
     ["/users", "Пользователи"],
     ["/settings", "Настройки"],
   ];

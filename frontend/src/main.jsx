@@ -23,6 +23,7 @@ import MissingAnalyticsPage from "./pages/MissingAnalyticsPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import UsersPage from "./pages/UsersPage";
+import AIAssistantPage from "./pages/AIAssistantPage";
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem("access_token");
@@ -69,6 +70,7 @@ function App() {
               <Route path="knowledge" element={<KnowledgeBasePage />} />
               <Route path="knowledge/:slug" element={<KnowledgeArticlePage />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="ai-assistant" element={<AIAssistantPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
               <Route path="integration-log" element={<IntegrationLogPage />} />

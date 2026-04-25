@@ -73,6 +73,7 @@ export default function DiagnosticIssuePage() {
       </ol>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={rerunFromIssue}>Проверить повторно</button>
+        <button onClick={() => navigate(`/ai-assistant?issueId=${issue.id}`)}>Открыть AI Assistant</button>
         <button onClick={() => setStatus("mark-fixed")}>Пометить как исправлено</button>
         <button onClick={() => setStatus("ignore")}>Игнорировать</button>
         <button onClick={() => setStatus("false-positive")}>Ложное срабатывание</button>
