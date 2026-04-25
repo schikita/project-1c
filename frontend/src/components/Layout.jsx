@@ -6,6 +6,7 @@ import {
   AppBar,
   Box,
   Button,
+  Container,
   Divider,
   Drawer,
   IconButton,
@@ -17,9 +18,6 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import RoutedPageCanvas from "./RoutedPageCanvas";
-
-const isHomePath = (pathname) => pathname === "/" || pathname === "";
 
 export default function Layout() {
   const location = useLocation();
@@ -155,18 +153,9 @@ export default function Layout() {
         {drawerList}
       </Drawer>
 
-      <Box
-        component="main"
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {isHomePath(location.pathname) ? <Outlet /> : <RoutedPageCanvas><Outlet /></RoutedPageCanvas>}
-      </Box>
+      <Container component="main" maxWidth="xl" sx={{ py: { xs: 2, md: 3 }, flex: 1 }}>
+        <Outlet />
+      </Container>
     </Box>
   );
 }
