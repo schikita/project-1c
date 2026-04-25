@@ -114,3 +114,59 @@ async def generate_correction_plan(context: dict[str, Any], model_name: str | No
         except Exception:
             pass
     return "mock-safe-planner", _validate_plan(_fallback_plan(context))
+
+
+def _fallback_chat_answer(context: dict[str, Any]) -> str:
+    question = (context.get("question") or "").strip()
+    kb = context.get("knowledge_articles") or []
+    if not kb:
+        return (
+            "Пока не нашел точный кейс в базе знаний. "
+            "Уточните вопрос: укажите категорию (НДС, закрытие месяца, сверки), симптомы и период."
+        )
+    top = kb[0]
+    checks = top.get("checks") or "Проверки не указаны."
+    steps = top.get("fix_steps") or "Шаги исправления не указаны."
+    return (
+        f"Вопрос: {question}\n\n"
+        f"Похожий кейс: {top.get('title', 'Статья базы знаний')}\n"
+        f"Категория: {top.get('category', 'не указана')}\n"
+        f"Почему это происходит: {top.get('causes', 'не указано')}\n\n"
+        f"Где проверить в 1С: {checks}\n\n"
+        f"Что сделать: {steps}"
+    )
+
+
+async def generate_chat_answer(context: dict[str, Any], model_name: str | None = None) -> tuple[str, str, bool]:
+    if settings.llm_provider == "openrouter" and settings.openrouter_api_key:
+        try:
+            model = model_name or settings.openrouter_model
+            system_prompt = (
+                "Ты помощник по бухгалтерии 1С и по приложению Diagnostic Assistant 1C. "
+                "Отвечай только на русском, простым языком, структурировано: "
+                "1) краткий вывод, 2) где смотреть в 1С, 3) что сделать шаг за шагом, 4) как проверить результат. "
+                "Не выдумывай факты, опирайся на переданный контекст."
+            )
+            async with httpx.AsyncClient(timeout=45) as client:
+                response = await client.post(
+                    f"{settings.openrouter_base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.openrouter_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
+                        ],
+                        "temperature": 0.2,
+                    },
+                )
+            response.raise_for_status()
+            answer = response.json()["choices"][0]["message"]["content"]
+            if answer and answer.strip():
+                return model, answer.strip(), False
+        except Exception:
+            pass
+    return "mock-chat-assistant", _fallback_chat_answer(context), True

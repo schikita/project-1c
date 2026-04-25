@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_db
-from app.ai_assistant.service import ALLOWED_ACTION_TYPES, generate_correction_plan
+from app.ai_assistant.service import ALLOWED_ACTION_TYPES, generate_chat_answer, generate_correction_plan
 from app.common.enums import DiagnosticStatus, UserRole
 from app.diagnostics.tasks import run_diagnostic_task
 from app.models import (
@@ -115,6 +115,12 @@ class KnowledgeArticlePatchRequest(BaseModel):
 class AIAssistantCreateRequest(BaseModel):
     issue_id: int
     model_name: str | None = None
+
+
+class AIAssistantChatRequest(BaseModel):
+    question: str
+    model_name: str | None = None
+    max_articles: int = 3
 
 
 def add_audit_log(db: Session, user_id: int | None, action: str, payload: dict | None = None):
@@ -623,6 +629,74 @@ def get_ai_assistant_run(run_id: int, db: Session = Depends(get_db), current_use
         "output_plan": run.output_plan_json,
         "status": run.status,
         "created_at": run.created_at,
+    }
+
+
+@app.post("/api/ai-assistant/chat")
+def ai_assistant_chat(
+    payload: AIAssistantChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+
+    articles = db.query(KnowledgeArticle).all()
+    q_words = [w for w in question.lower().split() if len(w) > 2]
+    scored: list[tuple[int, KnowledgeArticle]] = []
+    for article in articles:
+        haystack = " ".join(
+            [
+                article.title or "",
+                article.category or "",
+                article.symptoms or "",
+                article.causes or "",
+                article.checks or "",
+                article.fix_steps or "",
+                " ".join(article.tags_json or []),
+            ]
+        ).lower()
+        score = sum(1 for w in q_words if w in haystack)
+        if score > 0:
+            scored.append((score, article))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    selected = [x[1] for x in scored[: max(1, min(payload.max_articles, 5))]]
+
+    context = {
+        "question": question,
+        "knowledge_articles": [
+            {
+                "id": a.id,
+                "title": a.title,
+                "slug": a.slug,
+                "category": a.category,
+                "symptoms": a.symptoms,
+                "causes": a.causes,
+                "checks": a.checks,
+                "fix_steps": a.fix_steps,
+                "tags": a.tags_json or [],
+            }
+            for a in selected
+        ],
+        "app_hints": [
+            "Для запусков проверок используйте раздел Диагностика.",
+            "Для HTML-отчета используйте раздел Отчеты -> Экспорт HTML.",
+            "Для AI плана по конкретной проблеме используйте раздел AI Assistant.",
+        ],
+    }
+    model_name, answer, fallback_used = asyncio.run(generate_chat_answer(context=context, model_name=payload.model_name))
+    add_audit_log(
+        db,
+        current_user.id,
+        "ai_assistant.chat",
+        {"model_name": model_name, "fallback_used": fallback_used, "articles": [a.id for a in selected]},
+    )
+    return {
+        "answer": answer,
+        "model_name": model_name,
+        "fallback_used": fallback_used,
+        "articles": [{"id": a.id, "slug": a.slug, "title": a.title} for a in selected],
     }
 
 

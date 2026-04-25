@@ -5,89 +5,6 @@ import PageError from "../components/PageError";
 import PageLoader from "../components/PageLoader";
 import { useToast } from "../components/ToastProvider";
 
-function normalize(text) {
-  return (text || "").toLowerCase();
-}
-
-function splitLines(text) {
-  return (text || "")
-    .split(/\r?\n|;/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function buildKnowledgeAnswer(question, articles) {
-  const q = normalize(question);
-  if (!q) return null;
-
-  const top = articles
-    .map((a) => {
-      const haystack = normalize(
-        `${a.title} ${a.category} ${a.symptoms} ${a.causes} ${a.checks} ${a.fix_steps} ${(a.tags || []).join(" ")}`
-      );
-      const words = q.split(/\s+/).filter((w) => w.length > 2);
-      const score = words.reduce((sum, w) => (haystack.includes(w) ? sum + 1 : sum), 0);
-      return { article: a, score };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
-
-  if (top.length === 0) return null;
-
-  const first = top[0].article;
-  const checks = splitLines(first.checks).slice(0, 3);
-  const steps = splitLines(first.fix_steps).slice(0, 4);
-
-  return {
-    title: `Похоже на кейс: ${first.title}`,
-    body: [
-      first.symptoms ? `Что обычно происходит: ${first.symptoms}` : null,
-      first.causes ? `Почему это случается: ${first.causes}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    checks,
-    steps,
-    links: top.map((x) => ({ slug: x.article.slug, title: x.article.title })),
-  };
-}
-
-function buildAppAnswer(question) {
-  const q = normalize(question);
-  const has = (arr) => arr.some((x) => q.includes(x));
-
-  if (has(["запуск", "диагност", "проверк"])) {
-    return [
-      "Откройте раздел «Диагностика» -> создайте запуск -> выберите подключение, организацию и период.",
-      "После завершения откройте запуск и просмотрите проблемы.",
-      "Для контроля исправлений используйте «Проверить повторно».",
-    ];
-  }
-  if (has(["отчет", "экспорт", "html"])) {
-    return [
-      "Откройте «Отчеты».",
-      "Выберите нужный запуск.",
-      "Нажмите «Экспорт HTML» для готового отчета.",
-    ];
-  }
-  if (has(["подключ", "база", "1с"])) {
-    return [
-      "Откройте «Подключения» и выберите нужную базу 1С.",
-      "Нажмите «Проверить», чтобы убедиться, что доступ работает.",
-      "После этого запускайте диагностику.",
-    ];
-  }
-  if (has(["ии", "ai", "ассист"])) {
-    return [
-      "Откройте страницу «AI Assistant».",
-      "Укажите ID проблемы и нажмите «Сформировать план».",
-      "Используйте шаги из плана и затем сделайте повторную проверку.",
-    ];
-  }
-  return null;
-}
-
 export default function KnowledgeBasePage() {
   const [articles, setArticles] = useState([]);
   const [error, setError] = useState("");
@@ -105,6 +22,7 @@ export default function KnowledgeBasePage() {
   });
   const [chatInput, setChatInput] = useState("");
   const [isNarrow, setIsNarrow] = useState(typeof window !== "undefined" ? window.innerWidth < 1200 : false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([
     {
       id: 1,
@@ -187,47 +105,41 @@ export default function KnowledgeBasePage() {
     []
   );
 
-  const askAssistant = (questionRaw) => {
+  const askAssistant = async (questionRaw) => {
     const question = questionRaw.trim();
     if (!question) return;
 
     const userMsg = { id: Date.now(), role: "user", text: question };
     setChatMessages((prev) => [...prev, userMsg]);
-
-    const appHint = buildAppAnswer(question);
-    const knowledge = buildKnowledgeAnswer(question, articles);
-
-    let text = "";
-    if (knowledge) {
-      text += `${knowledge.title}\n\n`;
-      if (knowledge.body) text += `${knowledge.body}\n\n`;
-      if (knowledge.checks.length > 0) {
-        text += "Где смотреть в 1С:\n";
-        knowledge.checks.forEach((x, i) => {
-          text += `${i + 1}. ${x}\n`;
-        });
-        text += "\n";
-      }
-      if (knowledge.steps.length > 0) {
-        text += "Что сделать:\n";
-        knowledge.steps.forEach((x, i) => {
-          text += `${i + 1}. ${x}\n`;
-        });
-        text += "\n";
-      }
-      if (knowledge.links.length > 0) {
-        text += `Связанные статьи: ${knowledge.links.map((x) => x.title).join("; ")}.`;
-      }
-    } else if (appHint) {
-      text = `Вот что сделать в приложении:\n${appHint.map((x, i) => `${i + 1}. ${x}`).join("\n")}`;
-    } else {
-      text =
-        "Пока не нашел точный кейс в базе знаний. Уточните вопрос: укажите категорию (НДС, закрытие месяца, сверки), симптомы и период. Я подберу более точную рекомендацию.";
+    setChatLoading(true);
+    try {
+      const data = await apiFetch("/api/ai-assistant/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          question,
+          max_articles: 3,
+        }),
+      });
+      const source = data.fallback_used ? "Локальная подсказка (fallback)" : `Ответ модели: ${data.model_name}`;
+      const links =
+        (data.articles || []).length > 0
+          ? `\n\nСвязанные статьи: ${data.articles.map((x) => x.title).join("; ")}.`
+          : "";
+      const text = `${data.answer || "Ответ не получен."}${links}`;
+      setChatMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", text, meta: source }]);
+    } catch (err) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          text: "Не удалось получить ответ от AI API. Проверьте backend/OpenRouter и повторите запрос.",
+          meta: err.message || "Ошибка",
+        },
+      ]);
+    } finally {
+      setChatLoading(false);
     }
-
-    setTimeout(() => {
-      setChatMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", text }]);
-    }, 200);
   };
 
   return (
@@ -314,15 +226,35 @@ export default function KnowledgeBasePage() {
                 }}
               >
                 {m.text}
+                {m.meta ? (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#667085" }}>
+                    {m.meta}
+                  </div>
+                ) : null}
               </div>
             ))}
+            {chatLoading ? (
+              <div
+                style={{
+                  justifySelf: "start",
+                  maxWidth: "95%",
+                  background: "#ffffff",
+                  border: "1px solid #dde3ee",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  fontSize: 13,
+                }}
+              >
+                Думаю над ответом...
+              </div>
+            ) : null}
           </div>
         </div>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            askAssistant(chatInput);
+            void askAssistant(chatInput);
             setChatInput("");
           }}
           style={{ display: "grid", gap: 8 }}
@@ -333,7 +265,9 @@ export default function KnowledgeBasePage() {
             placeholder="Введите вопрос, например: как исправить ошибку по НДС?"
             rows={3}
           />
-          <button type="submit">Спросить</button>
+          <button type="submit" disabled={chatLoading}>
+            {chatLoading ? "Отправка..." : "Спросить"}
+          </button>
         </form>
       </aside>
     </div>
