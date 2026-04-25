@@ -83,7 +83,9 @@ export default function DiagnosticRunPage() {
         <p>
           Статус: <b>{run.status}</b>, прогресс: {run.progress_percent}%.
           {" "}
-          <button onClick={exportHtml}>Экспорт HTML</button>
+          <button onClick={exportHtml} style={{ marginLeft: 12, marginTop: 4 }}>
+            Экспорт HTML
+          </button>
         </p>
       )}
       <button onClick={rerun}>Повторить проверку</button>

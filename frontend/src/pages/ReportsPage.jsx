@@ -30,13 +30,14 @@ export default function ReportsPage() {
       <PageError message={error} />
       {loading && <PageLoader />}
       <p>Выберите запуск и откройте HTML-отчет:</p>
-      <ul>
+      <ul style={{ display: "grid", gap: 10, paddingLeft: 20 }}>
         {runs.map((run) => (
           <li key={run.id}>
             <Link to={`/diagnostics/runs/${run.id}`}>Запуск #{run.id}</Link>
             {" "}({run.diagnostic_type}, {run.status})
-            {" | "}
-            <button onClick={() => exportHtml(run.id)}>Экспорт HTML</button>
+            <button onClick={() => exportHtml(run.id)} style={{ marginLeft: 12, marginTop: 4 }}>
+              Экспорт HTML
+            </button>
           </li>
         ))}
       </ul>

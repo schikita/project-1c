@@ -98,11 +98,15 @@ export default function UsersPage() {
               <option value="onec_specialist">onec_specialist</option>
             </select>
             {" "}
-            <button onClick={() => toggleActive(u.id, u.is_active)} disabled={busyId === u.id}>
+            <button
+              onClick={() => toggleActive(u.id, u.is_active)}
+              disabled={busyId === u.id}
+              style={{ marginLeft: 12, marginTop: 4 }}
+            >
               {u.is_active ? "Деактивировать" : "Активировать"}
             </button>
             {" "}
-            <button onClick={() => removeUser(u.id)} disabled={busyId === u.id}>
+            <button onClick={() => removeUser(u.id)} disabled={busyId === u.id} style={{ marginLeft: 12, marginTop: 4 }}>
               Удалить
             </button>
           </li>
