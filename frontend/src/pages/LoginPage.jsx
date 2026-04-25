@@ -31,10 +31,21 @@ export default function LoginPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
-      <Card sx={{ width: 420, maxWidth: "95vw" }}>
-        <CardContent>
-          <Typography variant="h5" sx={{ mb: 2 }}>Вход в систему</Typography>
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        px: { xs: 2, sm: 3 },
+        py: { xs: 3, sm: 4 },
+        boxSizing: "border-box",
+      }}
+    >
+      <Card sx={{ width: 420, maxWidth: "100%", boxSizing: "border-box" }}>
+        <CardContent sx={{ px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
+          <Typography variant="h5" sx={{ mb: 2, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>
+            Вход в систему
+          </Typography>
           <Stack component="form" onSubmit={onSubmit} spacing={2}>
             <TextField value={email} onChange={(e) => setEmail(e.target.value)} label="Email" />
             <TextField value={password} onChange={(e) => setPassword(e.target.value)} type="password" label="Пароль" />
