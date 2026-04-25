@@ -6,6 +6,68 @@ import PageError from "../components/PageError";
 import SectionCard from "../components/SectionCard";
 import { useToast } from "../components/ToastProvider";
 
+function riskLabel(risk) {
+  const map = {
+    low: "Низкий",
+    medium: "Средний",
+    high: "Высокий",
+    critical: "Критический",
+  };
+  return map[risk] || risk || "-";
+}
+
+function statusLabel(status) {
+  const map = {
+    completed: "Завершено",
+    pending: "Ожидает",
+    failed: "Ошибка",
+    draft: "Черновик",
+    confirmed: "Подтвержден",
+    rejected: "Отклонен",
+  };
+  return map[status] || status || "-";
+}
+
+function actionTitle(actionType) {
+  const map = {
+    check_balance: "Проверка остатков",
+    fix_posting: "Исправление проводки",
+    reclose_period: "Повторное закрытие периода",
+    request_user_input: "Требуется ввод пользователя",
+  };
+  return map[actionType] || actionType || "Действие";
+}
+
+function readableActions(actions) {
+  return (actions || []).map((action, idx) => {
+    const payload = action.payload_json && typeof action.payload_json === "object" ? action.payload_json : {};
+    const payloadPairs = Object.entries(payload);
+    return {
+      id: action.id || idx + 1,
+      title: actionTitle(action.action_type),
+      status: statusLabel(action.status),
+      details:
+        payloadPairs.length === 0
+          ? "Детализация не передана."
+          : payloadPairs
+              .map(([k, v]) => `${k.replaceAll("_", " ")}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+              .join("; "),
+    };
+  });
+}
+
+function outputSummary(outputPlan) {
+  if (!outputPlan || typeof outputPlan !== "object") return null;
+  return {
+    title: outputPlan.title || "План корректировки",
+    description: outputPlan.description || "Описание не передано моделью.",
+    risk: riskLabel(outputPlan.risk_level),
+    requiresConfirmation: outputPlan.requires_confirmation ? "Да" : "Нет",
+    requiresBackup: outputPlan.requires_backup ? "Да" : "Нет",
+    actionsCount: Array.isArray(outputPlan.actions) ? outputPlan.actions.length : 0,
+  };
+}
+
 export default function AIAssistantPage() {
   const [searchParams] = useSearchParams();
   const { showToast } = useToast();
@@ -21,6 +83,8 @@ export default function AIAssistantPage() {
   const [planData, setPlanData] = useState(null);
 
   const canRun = useMemo(() => Number.isFinite(Number(issueId)) && Number(issueId) > 0 && !loading, [issueId, loading]);
+  const runSummary = useMemo(() => outputSummary(runData?.output_plan), [runData]);
+  const actions = useMemo(() => readableActions(planData?.actions), [planData]);
 
   const createRun = async () => {
     if (!canRun) return;
@@ -100,21 +164,32 @@ export default function AIAssistantPage() {
               Модель: <b>{runInfo.model_name || "-"}</b>
             </Typography>
             <Typography variant="body2">
-              Статус: <b>{runInfo.status || "-"}</b>
+              Статус: <b>{statusLabel(runInfo.status)}</b>
             </Typography>
           </Stack>
         </SectionCard>
       )}
 
-      {runData && (
-        <SectionCard title="AI Output Plan">
-          <Card variant="outlined">
-            <CardContent>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {JSON.stringify(runData.output_plan || {}, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
+      {runSummary && (
+        <SectionCard title="Рекомендация ИИ (кратко)">
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              Название плана: <b>{runSummary.title}</b>
+            </Typography>
+            <Typography variant="body2">{runSummary.description}</Typography>
+            <Typography variant="body2">
+              Уровень риска: <b>{runSummary.risk}</b>
+            </Typography>
+            <Typography variant="body2">
+              Нужна проверка человеком: <b>{runSummary.requiresConfirmation}</b>
+            </Typography>
+            <Typography variant="body2">
+              Нужна резервная копия: <b>{runSummary.requiresBackup}</b>
+            </Typography>
+            <Typography variant="body2">
+              Количество действий: <b>{runSummary.actionsCount}</b>
+            </Typography>
+          </Stack>
         </SectionCard>
       )}
 
@@ -125,21 +200,34 @@ export default function AIAssistantPage() {
               Заголовок: <b>{planData.title || "-"}</b>
             </Typography>
             <Typography variant="body2">
-              Риск: <b>{planData.risk_level || "-"}</b>
+              Риск: <b>{riskLabel(planData.risk_level)}</b>
             </Typography>
             <Typography variant="body2">
-              Статус: <b>{planData.status || "-"}</b>
+              Статус: <b>{statusLabel(planData.status)}</b>
             </Typography>
             <Typography variant="body2">{planData.description || "Описание отсутствует."}</Typography>
           </Stack>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Действия ({(planData.actions || []).length})
+                Действия ({actions.length})
               </Typography>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {JSON.stringify(planData.actions || [], null, 2)}
-              </pre>
+              {actions.length === 0 ? (
+                <Typography variant="body2">Действия не переданы.</Typography>
+              ) : (
+                <ol style={{ margin: 0, paddingLeft: 18 }}>
+                  {actions.map((action) => (
+                    <li key={action.id} style={{ marginBottom: 8 }}>
+                      <Typography variant="body2">
+                        <b>{action.title}</b> (статус: {action.status})
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {action.details}
+                      </Typography>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </CardContent>
           </Card>
         </SectionCard>
